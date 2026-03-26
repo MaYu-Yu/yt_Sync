@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .welcome-section { text-align: center; margin-bottom: 60px; }
+    .welcome-title {
+        font-size: 3rem; font-weight: 800; letter-spacing: -0.05em;
+        background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        margin-bottom: 15px;
+    }
+    .welcome-subtitle { color: var(--text-muted); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+
+    .entry-card { 
+        background-color: var(--card-bg); border: none; border-radius: 20px; padding: 40px;
+        height: 100%; box-shadow: 0 15px 35px rgba(0,0,0,0.05); transition: transform 0.3s ease;
+        border-top: 5px solid transparent; border-image: var(--primary-gradient) 1;
+        position: relative; overflow: hidden;
+    }
+    .entry-card:hover { transform: translateY(-8px); box-shadow: 0 20px 45px rgba(0,0,0,0.1); }
+    .entry-icon {
+        font-size: 2.5rem; background: var(--primary-gradient);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 25px;
+    }
+    .entry-title { font-weight: 700; font-size: 1.25rem; color: var(--text-dark); margin-bottom: 15px; }
+    .entry-text { color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 30px; }
+
+    .btn-gradient-primary { 
+        background: var(--primary-gradient); color: white; border: none; 
+        padding: 12px 30px; border-radius: 30px; font-weight: bold;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="welcome-section">
+        <h1 class="welcome-title">歡迎來到 Mayuyu's Gadget</h1>
+        <p class="welcome-subtitle">高效、美觀的自動化工具集</p>
+    </div>
+
+    <div class="row justify-content-center g-4">
+        <div class="col-md-6 col-lg-5">
+            <div class="entry-card text-center">
+                <i class="bi bi-arrow-repeat entry-icon"></i>
+                <h5 class="entry-title">YouTube Sync Manager</h5>
+                <p class="entry-text">管理 YouTube 頻道與播放清單，自動同步下載並嵌入封面與標籤。</p>
+                <a href="{{ url_for('sync_manager') }}" class="btn btn-gradient-primary">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>進入同步管理
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+# Ignore ffmpeg venv folder
+ffmpeg/
+venv/
+# Ignore yt-dlp executable
+yt-dlp.exe
+
+# Optional: ignore other temp or log files
+*.log
+*.tmp
