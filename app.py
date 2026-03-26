@@ -29,20 +29,22 @@ def index():
 @app.route('/delete_channel', methods=['POST'])
 def delete_channel():
     data = request.get_json()
-    channel_id = data.get('channelId')
-    if not channel_id:
-        return jsonify({'status': 'error', 'message': '缺少頻道 ID'}), 400
+    cid = data.get('channel_id')
+    if not cid:
+        return jsonify({'status': 'error', 'message': '接收到的頻道ID為空'}), 400
     
     try:
         with get_db() as conn:
-            # 1. 刪除該頻道擁有的所有播放清單
-            conn.execute('DELETE FROM playlists WHERE channel_id = ?', (channel_id,))
-            # 2. 刪除頻道本身
-            conn.execute('DELETE FROM channels WHERE id = ?', (channel_id,))
+            # 刪除播放清單
+            conn.execute('DELETE FROM playlists WHERE channel_id = ?', (cid,))
+            # 刪除頻道（根據你的庫結構，這裡通常是 id）
+            conn.execute('DELETE FROM channels WHERE id = ?', (cid,))
             conn.commit()
-        return jsonify({'status': 'ok'})
+        
+        return jsonify({'status': 'ok'}) 
+        
     except Exception as e:
-        print(f"Delete error: {e}")
+        print(f"刪除報錯: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 @app.route('/sync_manager', methods=['GET', 'POST'])
 def sync_manager():
