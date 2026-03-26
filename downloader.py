@@ -31,7 +31,7 @@ class YTDownloader:
             raise Exception("USER_STOP")
             
         if d['status'] == 'downloading':
-            self.current_status = f"下載中: {d.get('_percent_str', '0%')}"
+            self.current_status = "下載中..."
         elif d['status'] == 'finished':
             self.current_status = "合併檔案中..."
 
@@ -46,8 +46,8 @@ class YTDownloader:
             'progress_hooks': [self.progress_hook],
             'quiet': True,
             'noprogress': True,
-            'extract_flat': False, # 減少對外部 JS runtime 依賴
-            'ignoreerrors': True,
+            'extract_flat': False,
+            'ignoreerrors': False, # 【修正】設為 False，發生 USER_STOP 異常時才會直接拋出給 app.py
         }
 
         if audio_only:

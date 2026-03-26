@@ -148,28 +148,54 @@ async function startSync() {
         console.error(e);
     }
 }
+function startPolling() {
+    stopPolling(); 
+    poller = setInterval(async () => {
+        try {
+            const res = await fetch('/sync_status');
+            const data = await res.json();
+
+            if (data.is_running === true) {
+                // 計算百分比
+                const percent = data.total > 0 ? Math.round((data.current_idx / data.total) * 100) : 0;
+                
+                // 【注意】這裡的 ID 必須完全對應你 HTML 裡的 id="..."
+                const bar = document.getElementById('progress-bar'); 
+                const countText = document.getElementById('progress-count');
+                const taskName = document.getElementById('current-task-name');
+
+                if (bar) bar.style.width = percent + '%';
+                if (countText) countText.innerText = `${data.current_idx} / ${data.total}`;
+                if (taskName) taskName.innerText = "處理中: " + (data.current_name || "等待中...");
+                
+                // 更新細節狀態文字 (例如：下載中 15%)
+                const statusText = document.getElementById('progress-status');
+                if (statusText) statusText.innerText = data.dl_msg || "連線中...";
+
+            } else {
+                // 如果 is_running 變成 false，表示結束（正常結束或被停止）
+                stopPolling();
+                const modalEl = document.getElementById('syncModal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+                location.reload(); 
+            }
+        } catch (e) { console.error(e); }
+    }, 1000);
+}
 
 async function stopSync() {
-    // 1. 立即停止前端輪詢，防止畫面卡死
+    // 立即停止前端請求，避免畫面閃爍
     stopPolling();
+    
+    // 通知後端停止
+    await fetch('/stop_sync', { method: 'POST' });
 
-    // 2. 告知後端停止執行
-    fetch('/stop_sync', { method: 'POST' });
-
-    // 3. 暴力清理 UI
+    // 關閉視窗並刷新
     const modalEl = document.getElementById('syncModal');
     const modalInstance = bootstrap.Modal.getInstance(modalEl);
     if (modalInstance) modalInstance.hide();
-    
-    // 清除可能殘留的背景陰影與 Body 鎖定
-    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-    document.body.classList.remove('modal-open');
-    document.body.style.overflow = '';
-
-    // 4. 0.5 秒後直接刷新頁面
-    setTimeout(() => {
-        location.reload();
-    }, 500);
+    location.reload();
 }
 
 function stopPolling() {

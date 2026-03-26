@@ -59,11 +59,9 @@ def sync_manager():
 @app.route('/stop_sync', methods=['POST'])
 def stop_sync():
     global sync_state
-    # 1. 立即設定停止信號給下載器
     DL.is_stop_requested = True
-    # 2. 強行將狀態改為 False，讓下一秒前端 polling 讀到任務已結束
-    sync_state["is_running"] = False
-    sync_state["msg"] = "STOPPED"
+    sync_state["is_running"] = False # 強行停止，讓前端 polling 讀到 False
+    sync_state["msg"] = "USER_STOPPED"
     return jsonify({"status": "stop_requested"})
 
 @app.route('/start_sync', methods=['POST'])
@@ -73,9 +71,8 @@ def start_sync():
         return jsonify({"status": "error", "message": "任務進行中"})
     
     path = request.json.get('path')
-    if not path: return jsonify({"status": "error", "message": "路徑無效"})
-
     conn = get_db()
+    # 取得所有待同步的清單
     items = conn.execute('SELECT p.*, c.name as c_name FROM playlists p JOIN channels c ON p.channel_id = c.id WHERE p.track_flag > 0').fetchall()
     
     if not items: return jsonify({"status": "error", "message": "未選擇清單"})
@@ -88,10 +85,11 @@ def start_sync():
 
         try:
             for i, item in enumerate(items):
-                # 每個循環開始前檢查，若 stop_sync 被按下，這裡會直接跳出
+                # 檢查點 1：清單切換時立即檢查
                 if not sync_state["is_running"] or DL.is_stop_requested:
                     break
 
+                # 【修正】先更新索引，這樣進度條才會立刻從 0/5 變成 1/5
                 sync_state.update({"current_idx": i + 1, "current_name": item['title']})
                 
                 c_safe = re.sub(r'[\\/:*?"<>|]', '', item['c_name'])
@@ -103,10 +101,12 @@ def start_sync():
                     DL.download(f"https://www.youtube.com/playlist?list={item['id']}", 
                                 save_dir, item['channel_id'], (item['track_flag'] == 1))
                 except Exception as e:
-                    if "USER_STOP" in str(e): break
+                    # 【核心修正】如果捕捉到使用者停止的訊號，直接 break 整個迴圈
+                    if "USER_STOP" in str(e) or DL.is_stop_requested:
+                        print("偵測到停止信號，終止後續所有清單下載")
+                        break
                     continue
         finally:
-            # 清理與重置
             if DL.is_stop_requested and save_dir:
                 DL.cleanup_temp_files(save_dir)
             sync_state["is_running"] = False
@@ -114,6 +114,7 @@ def start_sync():
 
     threading.Thread(target=run_sync_logic, daemon=True).start()
     return jsonify({"status": "started"})
+
 @app.route('/sync_status')
 def sync_status():
     return jsonify({**sync_state, "dl_msg": DL.current_status})
