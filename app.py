@@ -7,6 +7,7 @@ from tkinter import filedialog
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+DB_NAME = 'yt_sync.db'
 
 # 全域狀態
 sync_state = {
@@ -19,9 +20,36 @@ sync_state = {
 }
 
 def get_db():
-    conn = sqlite3.connect('yt_tracker.db')
+    conn = sqlite3.connect(DB_NAME)
+    # 每次連線都開啟外鍵檢查
+    conn.execute('PRAGMA foreign_keys = ON;') 
     conn.row_factory = sqlite3.Row
     return conn
+
+def init_db():
+    """初始化資料庫表結構"""
+    with get_db() as conn:
+        # 這裡的 PRAGMA 其實可以拿掉了，因為 get_db() 裡已經有了
+        
+        # 建立 channels 表
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS channels (
+                id TEXT PRIMARY KEY NOT NULL, 
+                name TEXT NOT NULL
+            )
+        ''')
+        
+        # 建立 playlists 表
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS playlists (
+                id TEXT PRIMARY KEY NOT NULL, 
+                title TEXT NOT NULL, 
+                track_flag INTEGER DEFAULT 0, 
+                channel_id TEXT NOT NULL,
+                FOREIGN KEY (channel_id) REFERENCES channels (id) ON DELETE CASCADE
+            )
+        ''')
+        conn.commit()
 
 @app.route('/')
 def index(): 
@@ -46,26 +74,57 @@ def delete_channel():
     except Exception as e:
         print(f"刪除報錯: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-@app.route('/sync_manager', methods=['GET', 'POST'])
-def sync_manager():
+@app.route('/yt_sync_manager', methods=['GET', 'POST'])
+def yt_sync_manager():
     conn = get_db()
+    error_msg = None  # 用於紀錄錯誤訊息顯示在前端
+
     if request.method == 'POST' and 'import_url' in request.form:
         url = request.form.get('import_url').strip()
-        import yt_dlp
-        with yt_dlp.YoutubeDL({'extract_flat': True, 'quiet': True}) as ydl:
-            try:
-                info = ydl.extract_info(url, download=False)
-                if info:
-                    cid = info.get('channel_id') or info.get('id')
-                    cname = info.get('uploader') or info.get('title')
-                    conn.execute('INSERT OR IGNORE INTO channels VALUES (?,?)', (cid, cname))
-                    pl_info = ydl.extract_info(f"https://www.youtube.com/channel/{cid}/playlists", download=False)
-                    if pl_info and 'entries' in pl_info:
-                        for entry in pl_info.get('entries', []):
-                            conn.execute('INSERT OR IGNORE INTO playlists VALUES (?,?,0,?)', (entry['id'], entry['title'], cid))
-                    conn.commit()
-            except Exception as e:
-                print(f"Import Error: {e}")
+        if not url:
+            error_msg = "網址不能為空"
+        else:
+            import yt_dlp
+            # 優化參數：減少重試、關閉抓取過程中的警告
+            ydl_opts = {
+                'extract_flat': True, 
+                'quiet': True, 
+                'no_warnings': True,
+                'retries': 0,          # 不重試，失敗就立即回報
+                'fragment_retries': 0
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    # 第一步：嘗試獲取頻道資訊
+                    info = ydl.extract_info(url, download=False)
+                    if info:
+                        cid = info.get('channel_id') or info.get('id')
+                        cname = info.get('uploader') or info.get('title')
+                        
+                        # 如果找不到 ID，主動拋出異常
+                        if not cid:
+                            raise Exception("無法解析頻道 ID，請確認網址是否正確")
+
+                        conn.execute('INSERT OR IGNORE INTO channels VALUES (?,?)', (cid, cname))
+                        
+                        # 第二步：嘗試抓取該頻道的播放清單頁面
+                        # 加上 try 避免有些頻道根本沒有公開播放清單導致整段崩潰
+                        try:
+                            pl_url = f"https://www.youtube.com/channel/{cid}/playlists"
+                            pl_info = ydl.extract_info(pl_url, download=False)
+                            if pl_info and 'entries' in pl_info:
+                                for entry in pl_info.get('entries', []):
+                                    conn.execute('INSERT OR IGNORE INTO playlists VALUES (?,?,0,?)', 
+                                               (entry['id'], entry['title'], cid))
+                        except Exception as pl_e:
+                            print(f"Playlists Fetch Warning: {pl_e}")
+                            # 這裡可以不中斷，因為頻道 ID 已經存入了
+                        
+                        conn.commit()
+                except Exception as e:
+                    error_msg = f"匯入失敗: {str(e)}"
+                    print(f"Import Error: {e}")
     
     channels_data = []
     rows = conn.execute('SELECT * FROM channels').fetchall()
@@ -73,8 +132,9 @@ def sync_manager():
         c = dict(row)
         c['playlists'] = conn.execute('SELECT * FROM playlists WHERE channel_id=?', (row['id'],)).fetchall()
         channels_data.append(c)
-    return render_template('sync_manager.html', channels=channels_data)
-
+    
+    # 建議在 template 中顯示 error_msg
+    return render_template('yt_sync_manager.html', channels=channels_data, error_msg=error_msg)
 @app.route('/stop_sync', methods=['POST'])
 def stop_sync():
     global sync_state
@@ -159,8 +219,5 @@ def select_folder():
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    conn = sqlite3.connect('yt_tracker.db')
-    conn.execute('CREATE TABLE IF NOT EXISTS channels (id TEXT PRIMARY KEY, name TEXT)')
-    conn.execute('CREATE TABLE IF NOT EXISTS playlists (id TEXT PRIMARY KEY, title TEXT, track_flag INTEGER, channel_id TEXT)')
-    conn.close()
+    init_db()
     app.run(debug=True, port=5000)

@@ -206,7 +206,10 @@
                         style="text-decoration: none;">
                         <i class="bi bi-x-lg" style="font-size: 1.2rem; font-weight: bold;"></i>
                     </button>
-                    <span class="channel-name text-truncate">{{ channel.name }}</span>
+                    <a href="https://www.youtube.com/channel/{{ channel.id }}" target="_blank"
+                        class="text-decoration-none">
+                        <span class="channel-name text-truncate">{{ channel.name }}</span>
+                    </a>
                     <i class="bi bi-chevron-down chevron"></i>
                 </div>
 
@@ -220,7 +223,9 @@
                     <div class="card-body p-0 playlist-scroll">
                         {% for pl in channel.playlists %}
                         <div class="playlist-item" data-pid="{{pl.id}}">
-                            <div class="playlist-title text-truncate">{{ pl.title }}</div>
+                            <div class="playlist-title text-truncate"><a
+                                    href="https://www.youtube.com/playlist?list={{ pl.id }}" target="_blank"
+                                    class="text-decoration-none">{{ pl.title }}</a></div>
                             <div class="btn-custom-group d-flex gap-1">
                                 <div class="flex-grow-1">
                                     <div class="custom-radio-btn {% if pl.track_flag==0 %}selected-0{% endif %}"
@@ -449,41 +454,41 @@
         const data = await res.json();
         if (data.folder) document.getElementById(id).value = data.folder;
     }
-async function deleteChannel(cid, cname) {
-    if (!confirm(`確定要刪除頻道「${cname}」及其下所有播放清單嗎？`)) return;
+    async function deleteChannel(cid, cname) {
+        if (!confirm(`確定要刪除頻道「${cname}」及其下所有播放清單嗎？`)) return;
 
-    try {
-        const response = await fetch('/delete_channel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channel_id: cid })
-        });
+        try {
+            const response = await fetch('/delete_channel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel_id: cid })
+            });
 
-        if (!response.ok) throw new Error('Network response was not ok');
-        const result = await response.json();
+            if (!response.ok) throw new Error('Network response was not ok');
+            const result = await response.json();
 
-        if (result.status === 'ok') {
-            // 現在有了 ID，可以直接選取
-            const card = document.getElementById(`card-${cid}`);
+            if (result.status === 'ok') {
+                // 現在有了 ID，可以直接選取
+                const card = document.getElementById(`card-${cid}`);
 
-            if (card) {
-                // 執行淡出並滑出的動畫
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '0';
-                card.style.transform = 'scale(0.8) translateY(20px)'; 
-                
-                // 動畫結束後從 DOM 移除
-                setTimeout(() => {
-                    card.remove();
-                }, 500);
+                if (card) {
+                    // 執行淡出並滑出的動畫
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.8) translateY(20px)';
+
+                    // 動畫結束後從 DOM 移除
+                    setTimeout(() => {
+                        card.remove();
+                    }, 500);
+                }
+            } else {
+                alert('刪除失敗：' + result.message);
             }
-        } else {
-            alert('刪除失敗：' + result.message);
+        } catch (err) {
+            console.error(err);
+            alert('刪除請求失敗，請檢查網路或後端輸出');
         }
-    } catch (err) {
-        console.error(err);
-        alert('刪除請求失敗，請檢查網路或後端輸出');
     }
-}
 </script>
 {% endblock %}
