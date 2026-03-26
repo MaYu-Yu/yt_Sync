@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3, os, re, threading, traceback
-from downloader import DL
+from downloader import YTDownloader
 from concurrent.futures import ThreadPoolExecutor
 import tkinter as tk
 from tkinter import filedialog
@@ -8,7 +8,7 @@ from tkinter import filedialog
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 DB_NAME = 'yt_sync.db'
-
+DL=YTDownloader()
 # 全域狀態
 sync_state = {
     "is_running": False, 
