@@ -256,7 +256,7 @@
             <div class="modal-body p-4 text-center">
                 <div class="spinner-border text-primary mb-3" role="status"></div>
                 <h5 class="fw-bold mb-2">同步任務處理中</h5>
-                <p id="progress-status" class="text-muted small mb-3">連線中...</p>
+                <p id="progress-status" class="text-muted small mb-3">讀取中...</p>
                 <div class="progress mb-3" style="height: 10px; border-radius: 5px;">
                     <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
                         style="width: 0%"></div>
@@ -327,7 +327,7 @@
 
                     // 3. 更新目前任務名稱 - 修正 ID 為 current-task-name
                     const taskName = document.getElementById('current-task-name');
-                    if (taskName) taskName.innerText = "目前清單: " + (data.current_name || "準備中...");
+                    if (taskName) taskName.innerText = data.current_channel + " - " + (data.current_name || "準備中...");
 
                     // 4. 更新詳細狀態 (例如: 下載中...) - 修正 ID 為 progress-status
                     const statusText = document.getElementById('progress-status');

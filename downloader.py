@@ -71,7 +71,7 @@ class YTDownloader:
         if d['status'] == 'downloading':
             self.current_status = "下載中..."
         elif d['status'] == 'finished':
-            self.current_status = "處理檔案中..."
+            self.current_status = "處理中..."
 
     def download(self, url, save_path, channel_id, audio_only):
         os.makedirs(self.data_dir, exist_ok=True)

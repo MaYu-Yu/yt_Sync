@@ -169,7 +169,7 @@ def start_sync():
                     break
 
                 # 【修正】先更新索引，這樣進度條才會立刻從 0/5 變成 1/5
-                sync_state.update({"current_idx": i + 1, "current_name": item['title']})
+                sync_state.update({"current_idx": i + 1, "current_name": item['title'], "current_channel": item['c_name']})
                 
                 c_safe = re.sub(r'[\\/:*?"<>|]', '', item['c_name'])
                 p_safe = re.sub(r'[\\/:*?"<>|]', '', item['title'])
