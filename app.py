@@ -56,73 +56,67 @@ def sync_manager():
         channels_data.append(c)
     return render_template('sync_manager.html', channels=channels_data)
 
+@app.route('/stop_sync', methods=['POST'])
+def stop_sync():
+    global sync_state
+    # 1. 立即設定停止信號給下載器
+    DL.is_stop_requested = True
+    # 2. 強行將狀態改為 False，讓下一秒前端 polling 讀到任務已結束
+    sync_state["is_running"] = False
+    sync_state["msg"] = "STOPPED"
+    return jsonify({"status": "stop_requested"})
+
 @app.route('/start_sync', methods=['POST'])
 def start_sync():
     global sync_state
     if sync_state["is_running"]:
-        return jsonify({"status": "error", "message": "任務正在進行中"})
+        return jsonify({"status": "error", "message": "任務進行中"})
     
     path = request.json.get('path')
-    if not path or not os.path.exists(path):
-        return jsonify({"status": "error", "message": "下載路徑無效"})
+    if not path: return jsonify({"status": "error", "message": "路徑無效"})
 
     conn = get_db()
-    items = conn.execute('''
-        SELECT p.*, c.name as c_name 
-        FROM playlists p 
-        JOIN channels c ON p.channel_id = c.id 
-        WHERE p.track_flag > 0
-    ''').fetchall()
+    items = conn.execute('SELECT p.*, c.name as c_name FROM playlists p JOIN channels c ON p.channel_id = c.id WHERE p.track_flag > 0').fetchall()
     
-    if not items:
-        return jsonify({"status": "error", "message": "請先勾選要同步的播放清單"})
+    if not items: return jsonify({"status": "error", "message": "未選擇清單"})
 
-    def run_sync_thread():
+    def run_sync_logic():
         global sync_state
-        sync_state.update({"is_running": True, "total": len(items), "current_idx": 0, "msg": "Running", "error": ""})
+        sync_state.update({"is_running": True, "total": len(items), "current_idx": 0, "msg": "RUNNING"})
         DL.is_stop_requested = False
-        DL.last_error = ""
+        save_dir = ""
 
         try:
-            # 這裡建議使用單執行緒或較少的 worker 避免 YouTube 封鎖 IP
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                futures = []
-                for i, item in enumerate(items):
-                    if DL.is_stop_requested: break
-                    
-                    sync_state.update({"current_idx": i + 1, "current_name": item['title']})
-                    c_safe = re.sub(r'[\\/:*?"<>|]', '', item['c_name'])
-                    p_safe = re.sub(r'[\\/:*?"<>|]', '', item['title'])
-                    save_dir = os.path.join(path, c_safe, p_safe)
-                    
-                    # 判斷是否僅下載音訊 (track_flag=1 為音樂)
-                    audio_only = (item['track_flag'] == 1)
-                    
-                    f = executor.submit(DL.download, 
-                                        f"https://www.youtube.com/playlist?list={item['id']}", 
-                                        save_dir, 
-                                        item['channel_id'], 
-                                        audio_only)
-                    futures.append(f)
-                
-                for f in futures: f.result()
-                
-        except Exception as e:
-            sync_state["error"] = str(e)
-        
-        sync_state.update({"is_running": False, "msg": "FINISH", "error": DL.last_error})
+            for i, item in enumerate(items):
+                # 每個循環開始前檢查，若 stop_sync 被按下，這裡會直接跳出
+                if not sync_state["is_running"] or DL.is_stop_requested:
+                    break
 
-    threading.Thread(target=run_sync_thread, daemon=True).start()
+                sync_state.update({"current_idx": i + 1, "current_name": item['title']})
+                
+                c_safe = re.sub(r'[\\/:*?"<>|]', '', item['c_name'])
+                p_safe = re.sub(r'[\\/:*?"<>|]', '', item['title'])
+                save_dir = os.path.join(path, c_safe, p_safe)
+                os.makedirs(save_dir, exist_ok=True)
+
+                try:
+                    DL.download(f"https://www.youtube.com/playlist?list={item['id']}", 
+                                save_dir, item['channel_id'], (item['track_flag'] == 1))
+                except Exception as e:
+                    if "USER_STOP" in str(e): break
+                    continue
+        finally:
+            # 清理與重置
+            if DL.is_stop_requested and save_dir:
+                DL.cleanup_temp_files(save_dir)
+            sync_state["is_running"] = False
+            DL.is_stop_requested = False
+
+    threading.Thread(target=run_sync_logic, daemon=True).start()
     return jsonify({"status": "started"})
-
 @app.route('/sync_status')
 def sync_status():
     return jsonify({**sync_state, "dl_msg": DL.current_status})
-
-@app.route('/stop_sync', methods=['POST'])
-def stop_sync():
-    DL.is_stop_requested = True
-    return jsonify({"status": "stop_requested"})
 
 @app.route('/toggle_flag_ajax', methods=['POST'])
 def toggle_flag_ajax():

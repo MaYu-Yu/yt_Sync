@@ -149,41 +149,35 @@ async function startSync() {
     }
 }
 
-function startPolling() {
-    poller = setInterval(async () => {
-        try {
-            const res = await fetch('/sync_status');
-            const data = await res.json();
+async function stopSync() {
+    // 1. 立即停止前端輪詢，防止畫面卡死
+    stopPolling();
 
-            if (data.is_running) {
-                const percent = data.total > 0 ? Math.round((data.current_idx / data.total) * 100) : 0;
-                
-                document.getElementById('progress-bar').style.width = percent + '%';
-                document.getElementById('progress-percent').innerText = percent + '%';
-                document.getElementById('progress-count').innerText = `${data.current_idx} / ${data.total}`;
-                document.getElementById('current-task-name').innerText = "處理中: " + (data.current_name || "準備中...");
-                document.getElementById('progress-status').innerText = data.dl_msg || "正在初始化...";
-            } else {
-                stopPolling();
-                syncModalInstance.hide();
-                if(data.error) alert("同步結束但有錯誤: " + data.error);
-                else alert("🎉 所有任務已同步完成！");
-                location.reload();
-            }
-        } catch (e) { console.error(e); }
-    }, 1000);
+    // 2. 告知後端停止執行
+    fetch('/stop_sync', { method: 'POST' });
+
+    // 3. 暴力清理 UI
+    const modalEl = document.getElementById('syncModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+    
+    // 清除可能殘留的背景陰影與 Body 鎖定
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+
+    // 4. 0.5 秒後直接刷新頁面
+    setTimeout(() => {
+        location.reload();
+    }, 500);
 }
 
 function stopPolling() {
-    if(poller) clearInterval(poller);
-}
-
-async function stopSync() {
-    if(confirm("確定要停止下載嗎？這將會中斷目前的進度。")) {
-        await fetch('/stop_sync', { method: 'POST' });
+    if (poller) {
+        clearInterval(poller);
+        poller = null;
     }
 }
-
 // 其餘功能函數 (changeMode, quickTrackAll, toggleFolder, massToggle, pickFolder) 保持原樣
 async function changeMode(el, val) {
     const item = el.closest('.playlist-item');
