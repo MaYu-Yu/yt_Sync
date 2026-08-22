@@ -7,4 +7,4 @@ Jinja2==3.1.6
 MarkupSafe==3.0.3
 pysqlite3==0.6.0
 Werkzeug==3.1.7
-yt-dlp==2026.3.17
+yt-dlp==2026.8.19
