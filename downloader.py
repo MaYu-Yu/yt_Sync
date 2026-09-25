@@ -86,12 +86,13 @@ class YTDownloader:
             'quiet': False,
             'noprogress': False,
             'extract_flat': False,
-            'ignoreerrors': False,
+            'ignoreerrors': True,
             'overwrites': True,
             
             # 啟用縮圖與 Metadata 功能
             'writethumbnail': True,
             'addmetadata': True,
+            'write_playlist_thumbnails': False,
         }
 
         # 定義後處理器清單
