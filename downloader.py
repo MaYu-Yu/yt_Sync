@@ -58,7 +58,7 @@ class YTDownloader:
     def cleanup_temp_files(self, save_path):
         if not os.path.exists(save_path): return
         time.sleep(1.5) 
-        temp_patterns = ['*.part', '*.ytdl', '*.temp', '*.tmp', '*.part.temp']
+        temp_patterns = ['*.part', '*.ytdl', '*.temp', '*.tmp', '*.part.temp', '*.jpg', '*.webm']
         for pat in temp_patterns:
             for f in glob.glob(os.path.join(save_path, pat)):
                 try: os.remove(f)
@@ -92,7 +92,6 @@ class YTDownloader:
             # 啟用縮圖與 Metadata 功能
             'writethumbnail': True,
             'addmetadata': True,
-            'write_playlist_thumbnails': False,
         }
 
         # 定義後處理器清單
